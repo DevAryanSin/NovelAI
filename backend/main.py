@@ -1,157 +1,16 @@
-# from fastapi import FastAPI, HTTPException
-# from fastapi.middleware.cors import CORSMiddleware
-# from pydantic import BaseModel
-# from google import genai
-# from google.genai import types
-# import os
-# import json
-# import base64
-# import time
-# from dotenv import load_dotenv
-
-# load_dotenv()
-
-# app = FastAPI()
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# class ChapterRequest(BaseModel):
-#     text: str
-
-# @app.post("/process_chapter")
-# async def process_chapter(request: ChapterRequest):
-#     # Retrieve Keys
-#     key_text_image = os.environ.get("GEMINI_API_KEY_TEXT_IMAGE")
-#     key_video = os.environ.get("GEMINI_API_KEY_VIDEO")
-
-#     if not key_text_image or not key_video:
-#         raise HTTPException(status_code=500, detail="Missing API Keys in server environment")
-
-#     # 1. Initialize Clients
-#     client_ti = genai.Client(api_key=key_text_image)
-#     client_v = genai.Client(api_key=key_video)
-
-#     # Helper for Retries
-#     def generate_with_retry(client_method, **kwargs):
-#         max_retries = 3
-#         for attempt in range(max_retries):
-#             try:
-#                 return client_method(**kwargs)
-#             except Exception as e:
-#                 # Check for 503 (Unavailable) or 429 (Too Many Requests)
-#                 error_str = str(e)
-#                 if "503" in error_str or "429" in error_str:
-#                     if attempt < max_retries - 1:
-#                         sleep_time = 2 ** attempt # Exponential backoff: 1s, 2s, 4s
-#                         print(f"Model overload (503/429), retrying in {sleep_time}s...")
-#                         time.sleep(sleep_time)
-#                         continue
-#                 raise e
-
-#     # 2. Simplify Text (Gemini 2.5 Flash)
-#     try:
-#         prompt_simp = f"Simplify the following novel chapter for a young child (age 6-8). Return only the story text.\n\n{request.text}"
-        
-#         # User requested gemini-2.5-flash
-#         resp_simp = generate_with_retry(
-#             client_ti.models.generate_content,
-#             model="gemini-2.5-flash", 
-#             contents=prompt_simp
-#         )
-#         simplified_text = resp_simp.text
-#     except Exception as e:
-#         print(f"Simplification Error: {e}")
-#         return {"error": f"Simplification failed: {e}"}
-
-#     # 3. Extract Prompts
-#     try:
-#         prompt_extract = f"Extract a vivid image prompt and a short video prompt from this story. Return JSON: {{'image_prompt': '...', 'video_prompt': '...'}} \n\n Story: {simplified_text}"
-#         resp_prompts = generate_with_retry(
-#             client_ti.models.generate_content,
-#             model="gemini-2.5-flash",
-#             contents=prompt_extract,
-#             config=types.GenerateContentConfig(response_mime_type="application/json")
-#         )
-#         prompts = json.loads(resp_prompts.text)
-#     except Exception as e:
-#         print(f"Prompt Extract Error: {e}")
-#         prompts = {"image_prompt": "A magical story scene", "video_prompt": "A character walking"}
-
-#     # 4. Generate Image (Gemini 2.5 Flash as requested)
-#     image_b64 = ""
-#     try:
-#         # Use generate_images (plural) and specific image model if needed, 
-#         # or gemini-2.5-flash if it supports it via this method.
-#         # Based on debug list: models/gemini-2.5-flash-image seems appropriate.
-#         resp_img = generate_with_retry(
-#             client_ti.models.generate_images,
-#             model="imagen-4.0-fast-generate-001", 
-#             prompt=prompts.get("image_prompt", "Magic scene"),
-#             config=types.GenerateImagesConfig(number_of_images=1)
-#         )
-#         if resp_img.generated_images:
-#             img_bytes = resp_img.generated_images[0].image.image_bytes
-#             image_b64 = "data:image/jpeg;base64," + base64.b64encode(img_bytes).decode('utf-8')
-#     except Exception as e:
-#         print(f"Image Gen Error: {e}")
-#         image_b64 = "https://placehold.co/800x600?text=Image+Error"
-
-#     # 5. Generate Video (Veo 3.0 Fast)
-#     video_url = ""
-#     try:
-#         # User specified: veo-3.0-fast-preview -> veo-3.0-fast-generate-001
-        
-#         resp_video = generate_with_retry(
-#             client_v.models.generate_videos,
-#             model="veo-3.0-fast-generate-001",
-#             prompt=prompts.get("video_prompt", "Magic video")
-#         )
-        
-#         print(f"Video Generation Response Type: {type(resp_video)}")
-#         # If the response contains a video asset directly (synchronous for fast models sometimes)
-#         # or an operation.
-#         # For now, we will inspect the structure via logs or just assume placeholder 
-#         # until we confirm how to extract the URL/bytes from this specific SDK version's response.
-        
-#         # In many recent versions:
-#         # if hasattr(resp_video, 'generated_videos'):
-#         #     video_url = resp_video.generated_videos[0].video.uri # or similar
-        
-#         # For safety, logging and keeping placeholder or basic extraction if obvious.
-#         if hasattr(resp_video, 'name'): # It might be an operation
-#              print(f"Video Operation Name: {resp_video.name}")
-        
-#         video_url = "https://placehold.co/800x600?text=Video+Generated+(Check+Logs)"
-        
-#     except Exception as e:
-#         print(f"Video Gen Error: {e}")
-#         video_url = "https://placehold.co/800x600?text=Video+Error"
-
-#     return {
-#         "original_text": request.text,
-#         "simplified_text": simplified_text,
-#         "prompts": prompts,
-#         "imageUrl": image_b64,
-#         "videoUrl": video_url 
-#     }
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
 import os
 import base64
+import re
+import time
+from typing import List, Optional
 from dotenv import load_dotenv
+import PyPDF2
+import io
 
 load_dotenv()
 
@@ -165,74 +24,225 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ChapterRequest(BaseModel):
-    text: str
-
-# Initialize Gemini client ONCE
+# Initialize Gemini client
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     raise RuntimeError("GEMINI_API_KEY missing")
 
 client = genai.Client(api_key=api_key)
 
-@app.post("/process_chapter")
-async def process_chapter(request: ChapterRequest):
+class Chapter(BaseModel):
+    chapter_number: int
+    title: str
+    simplified_text: str
+    image: Optional[str] = ""
+    image_prompt: Optional[str] = ""
 
-    # 1️⃣ Simplify text (Gemini 2.5 Flash)
-    simplify_prompt = f"""
-    Simplify the following story for a 6–8 year old child.
-    Use simple language and short sentences.
-    Return ONLY the story text.
+class ProcessedBook(BaseModel):
+    title: str
+    total_chapters: int
+    chapters: List[Chapter]
 
-    Story:
-    {request.text}
+class ImageRequest(BaseModel):
+    chapter_number: int
+    simplified_text: str
+
+def retry_with_backoff(func, max_retries=3, initial_delay=2):
+    """Retry function with exponential backoff for API overload"""
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            error_str = str(e)
+            if "503" in error_str or "UNAVAILABLE" in error_str or "overloaded" in error_str.lower():
+                if attempt < max_retries - 1:
+                    delay = initial_delay * (2 ** attempt)
+                    print(f"API overloaded, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(delay)
+                    continue
+            raise e
+    raise Exception("Max retries exceeded")
+
+def extract_text_from_pdf(pdf_file: bytes) -> str:
+    """Extract text from PDF file"""
+    try:
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file))
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading PDF: {str(e)}")
+
+def split_into_chapters(text: str) -> List[dict]:
+    """Split text into chapters using common patterns"""
+    chapter_pattern = r'(?:Chapter|CHAPTER|Ch\.|CH\.)\s*(\d+|[IVX]+)(?:\s*[:\-–—]\s*(.+?))?(?=\n|$)'
+    
+    chapters = []
+    matches = list(re.finditer(chapter_pattern, text, re.MULTILINE))
+    
+    if matches:
+        for i, match in enumerate(matches):
+            chapter_num = i + 1
+            chapter_title = match.group(2) if match.group(2) else f"Chapter {chapter_num}"
+            
+            start_pos = match.end()
+            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            chapter_text = text[start_pos:end_pos].strip()
+            
+            if len(chapter_text) > 3000:
+                chapter_text = chapter_text[:3000] + "..."
+            
+            chapters.append({
+                "number": chapter_num,
+                "title": chapter_title.strip(),
+                "text": chapter_text
+            })
+    else:
+        words = text.split()
+        chunk_size = 500
+        for i in range(0, len(words), chunk_size):
+            chunk = " ".join(words[i:i + chunk_size])
+            chapters.append({
+                "number": i // chunk_size + 1,
+                "title": f"Part {i // chunk_size + 1}",
+                "text": chunk
+            })
+    
+    return chapters[:10]
+
+def simplify_for_kids(text: str) -> str:
+    """Simplify text for children aged 6-8"""
+    prompt = f"""
+    Rewrite the following story excerpt in simple English for children aged 6-8 years old.
+    Use short sentences, simple words, and make it engaging and fun.
+    Keep the main story elements but make it easy to understand.
+    
+    Original text:
+    {text}
+    
+    Simplified version:
     """
+    
+    try:
+        def call_api():
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            return response.text.strip()
+        
+        return retry_with_backoff(call_api)
+    except Exception as e:
+        print(f"Simplification error: {e}")
+        return "Once upon a time, there was a wonderful story..."
 
-    simplify_resp = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=simplify_prompt
-    )
-
-    simplified_text = simplify_resp.text
-
-    # 2️⃣ Extract image prompt (Gemini reasoning)
-    extract_prompt = f"""
-    From the story below, create ONE vivid image prompt
-    suitable for a children's illustrated book.
-
+def generate_image_prompt(simplified_text: str) -> str:
+    """Generate a vivid image prompt from the text"""
+    prompt = f"""
+    Based on this children's story, create ONE vivid image prompt for a children's book illustration.
+    Make it colorful, engaging, and appropriate for kids.
+    
     Story:
     {simplified_text}
-
+    
     Return ONLY the image prompt text.
     """
-
-    img_prompt_resp = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=extract_prompt
-    )
-
-    image_prompt = img_prompt_resp.text
-
-    # 3️⃣ Generate Image (Gemini Image Model)
-    image_resp = client.models.generate_content(
-        model="gemini-2.5-flash-image",
-        contents=image_prompt,
-        config=types.GenerateContentConfig(
-            response_modalities=["IMAGE"]
-        )
-    )
-
-    image_base64 = ""
-    for part in image_resp.candidates[0].content.parts:
-        if part.inline_data:
-            image_bytes = part.inline_data.data
-            image_base64 = (
-                "data:image/png;base64," +
-                base64.b64encode(image_bytes).decode()
+    
+    try:
+        def call_api():
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
             )
+            return response.text.strip()
+        
+        result = retry_with_backoff(call_api)
+        return result
+    except Exception as e:
+        print(f"Prompt generation error: {e}")
+        return "A colorful children's book illustration"
 
+def generate_image(prompt: str) -> str:
+    """Generate image using Gemini"""
+    try:
+        enhanced_prompt = f"Children's book illustration style, colorful and vibrant: {prompt}"
+        
+        def call_api():
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-image",
+                contents=enhanced_prompt,
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"]
+                )
+            )
+            return response
+        
+        response = retry_with_backoff(call_api)
+        
+        for part in response.candidates[0].content.parts:
+            if part.inline_data:
+                image_bytes = part.inline_data.data
+                return "data:image/png;base64," + base64.b64encode(image_bytes).decode()
+        
+        return ""
+    except Exception as e:
+        print(f"Image generation error: {e}")
+        return ""
+
+@app.post("/process_pdf", response_model=ProcessedBook)
+async def process_pdf(file: UploadFile = File(...)):
+    """Process uploaded PDF - only simplify text, don't generate images yet"""
+    
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    pdf_content = await file.read()
+    full_text = extract_text_from_pdf(pdf_content)
+    
+    lines = full_text.split('\n')
+    book_title = lines[0].strip() if lines else file.filename.replace('.pdf', '')
+    
+    raw_chapters = split_into_chapters(full_text)
+    
+    processed_chapters = []
+    
+    for chapter_data in raw_chapters:
+        print(f"Processing Chapter {chapter_data['number']}: {chapter_data['title']}")
+        
+        # Only simplify text - don't generate images yet
+        simplified = simplify_for_kids(chapter_data['text'])
+        
+        # Add delay between chapters to avoid API overload
+        time.sleep(1.5)
+        
+        processed_chapters.append(Chapter(
+            chapter_number=chapter_data['number'],
+            title=chapter_data['title'],
+            simplified_text=simplified,
+            image="",  # Empty - will be generated on-demand
+            image_prompt=""
+        ))
+    
+    return ProcessedBook(
+        title=book_title,
+        total_chapters=len(processed_chapters),
+        chapters=processed_chapters
+    )
+
+@app.post("/generate_images")
+async def generate_images(request: ImageRequest):
+    """Generate images for a specific chapter on-demand"""
+    
+    print(f"Generating image for Chapter {request.chapter_number}")
+    
+    # Generate image prompt
+    prompt = generate_image_prompt(request.simplified_text)
+    
+    # Generate image
+    image = generate_image(prompt)
+    
     return {
-        "simplified_text": simplified_text,
-        "image_prompt": image_prompt,
-        "image": image_base64
+        "image": image,
+        "image_prompt": prompt
     }

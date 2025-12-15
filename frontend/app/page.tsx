@@ -1,22 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import InputSection from "@/components/InputSection";
-import StoryDisplay from "@/components/StoryDisplay";
-import { processChapter, ProcessResult } from "@/app/actions";
+import PDFUpload from "@/components/PDFUpload";
+import BookDisplay from "@/components/BookDisplay";
+import { processPDF, ProcessedBook } from "@/app/actions";
 import { BookOpen } from "lucide-react";
 
 export default function Home() {
-  const [result, setResult] = useState<ProcessResult | null>(null);
+  const [book, setBook] = useState<ProcessedBook | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
 
-  const handleProcess = async (text: string) => {
+  const handleUpload = async (file: File) => {
     setIsProcessing(true);
     setError("");
     try {
-      const res = await processChapter(text);
-      setResult(res);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const result = await processPDF(formData);
+      setBook(result);
     } catch (err) {
       console.error(err);
       setError("Something went wrong! Please try again.");
@@ -26,7 +29,7 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    setResult(null);
+    setBook(null);
     setError("");
   };
 
@@ -43,7 +46,7 @@ export default function Home() {
             Story Illustrator
           </h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Transform your stories into illustrated children's books
+            Transform your novels into illustrated children's books
           </p>
         </div>
 
@@ -56,10 +59,10 @@ export default function Home() {
 
         {/* Content Area */}
         <div className="w-full transition-all duration-500">
-          {!result ? (
-            <InputSection onProcess={handleProcess} isProcessing={isProcessing} />
+          {!book ? (
+            <PDFUpload onUpload={handleUpload} isProcessing={isProcessing} />
           ) : (
-            <StoryDisplay result={result} onReset={handleReset} />
+            <BookDisplay book={book} onReset={handleReset} />
           )}
         </div>
 

@@ -6,14 +6,25 @@ export interface ProcessResult {
     image: string;
 }
 
-export async function processChapter(text: string): Promise<ProcessResult> {
+export interface Chapter {
+    chapter_number: number;
+    title: string;
+    simplified_text: string;
+    image: string;
+    image_prompt: string;
+}
+
+export interface ProcessedBook {
+    title: string;
+    total_chapters: number;
+    chapters: Chapter[];
+}
+
+export async function processPDF(formData: FormData): Promise<ProcessedBook> {
     try {
-        const response = await fetch("http://localhost:8000/process_chapter", {
+        const response = await fetch("http://localhost:8000/process_pdf", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ text }),
+            body: formData,
             cache: "no-store",
         });
 
@@ -27,13 +38,35 @@ export async function processChapter(text: string): Promise<ProcessResult> {
             throw new Error(data.error);
         }
 
-        return {
-            simplifiedText: data.simplified_text,
-            imagePrompt: data.image_prompt,
-            image: data.image || "",
-        };
+        return data;
     } catch (error) {
-        console.error("Process Chapter Error:", error);
+        console.error("Process PDF Error:", error);
+        throw error;
+    }
+}
+
+export async function generateChapterImages(chapterNumber: number, simplifiedText: string) {
+    try {
+        const response = await fetch("http://localhost:8000/generate_images", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                chapter_number: chapterNumber,
+                simplified_text: simplifiedText,
+            }),
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Generate Images Error:", error);
         throw error;
     }
 }
