@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
@@ -11,6 +12,12 @@ from typing import List, Optional
 from dotenv import load_dotenv
 import PyPDF2
 import io
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER
+from PIL import Image
 
 load_dotenv()
 
@@ -285,3 +292,123 @@ async def generate_images(request: ImageRequest):
         "image": image,
         "image_prompt": prompt
     }
+
+@app.post("/download_pdf")
+async def download_pdf(book: ProcessedBook):
+    """Generate a downloadable PDF with all chapters and images"""
+    
+    print(f"Generating PDF for: {book.title}")
+    
+    # Create PDF in memory
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor='#1e293b',
+        spaceAfter=30,
+        alignment=TA_CENTER
+    )
+    
+    chapter_title_style = ParagraphStyle(
+        'ChapterTitle',
+        parent=styles['Heading2'],
+        fontSize=18,
+        textColor='#334155',
+        spaceAfter=20,
+        spaceBefore=20
+    )
+    
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['BodyText'],
+        fontSize=12,
+        leading=18,
+        textColor='#475569'
+    )
+    
+    # Add book title
+    story.append(Paragraph(book.title, title_style))
+    story.append(Spacer(1, 0.5*inch))
+    
+    # Process each chapter
+    for i, chapter in enumerate(book.chapters):
+        print(f"Adding Chapter {chapter.chapter_number} to PDF")
+        
+        # Generate image if not already generated
+        if not chapter.image:
+            print(f"Generating missing image for Chapter {chapter.chapter_number}")
+            try:
+                prompt = generate_image_prompt(chapter.simplified_text)
+                chapter.image = generate_image(prompt)
+                time.sleep(1)  # Small delay to avoid API overload
+            except Exception as e:
+                print(f"Error generating image for chapter {chapter.chapter_number}: {e}")
+        
+        # Add chapter title
+        story.append(Paragraph(f"Chapter {chapter.chapter_number}: {chapter.title}", chapter_title_style))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Add chapter text
+        paragraphs = chapter.simplified_text.split('\n')
+        for para in paragraphs:
+            if para.strip():
+                story.append(Paragraph(para.strip(), body_style))
+                story.append(Spacer(1, 0.1*inch))
+        
+        # Add image if available
+        if chapter.image:
+            try:
+                # Decode base64 image
+                if chapter.image.startswith('data:image'):
+                    image_data = chapter.image.split(',')[1]
+                else:
+                    image_data = chapter.image
+                
+                image_bytes = base64.b64decode(image_data)
+                img_buffer = io.BytesIO(image_bytes)
+                
+                # Open with PIL to get dimensions
+                pil_img = Image.open(img_buffer)
+                img_width, img_height = pil_img.size
+                
+                # Calculate scaled dimensions (max width 5 inches)
+                max_width = 5 * inch
+                aspect_ratio = img_height / img_width
+                scaled_width = min(max_width, img_width)
+                scaled_height = scaled_width * aspect_ratio
+                
+                # Reset buffer position
+                img_buffer.seek(0)
+                
+                # Add image to PDF
+                story.append(Spacer(1, 0.2*inch))
+                rl_image = RLImage(img_buffer, width=scaled_width, height=scaled_height)
+                story.append(rl_image)
+                
+            except Exception as e:
+                print(f"Error adding image for chapter {chapter.chapter_number}: {e}")
+        
+        # Add page break between chapters (except last one)
+        if i < len(book.chapters) - 1:
+            story.append(PageBreak())
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    # Return as downloadable file
+    filename = f"{book.title.replace(' ', '_')}_Kids_Edition.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )

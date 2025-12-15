@@ -70,3 +70,37 @@ export async function generateChapterImages(chapterNumber: number, simplifiedTex
         throw error;
     }
 }
+
+export async function downloadBookPDF(book: ProcessedBook): Promise<void> {
+    try {
+        const response = await fetch("http://localhost:8000/download_pdf", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(book),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend error: ${response.statusText}`);
+        }
+
+        // Get the blob from response
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${book.title.replace(/\s+/g, '_')}_Kids_Edition.pdf`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (error) {
+        console.error("Download PDF Error:", error);
+        throw error;
+    }
+}

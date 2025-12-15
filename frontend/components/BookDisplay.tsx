@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, RotateCcw, Loader2 } from "lucide-react";
-import { ProcessedBook, generateChapterImages } from "@/app/actions";
+import { ChevronLeft, ChevronRight, RotateCcw, Loader2, Download } from "lucide-react";
+import { ProcessedBook, generateChapterImages, downloadBookPDF } from "@/app/actions";
 
 interface BookDisplayProps {
     book: ProcessedBook;
@@ -15,6 +15,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
     const [direction, setDirection] = useState(0);
     const [loadingImages, setLoadingImages] = useState<{ [key: number]: boolean }>({});
     const [chapterImages, setChapterImages] = useState<{ [key: number]: { image: string; image_prompt: string } }>({});
+    const [isDownloading, setIsDownloading] = useState(false);
 
     const totalChapters = book.chapters.length;
 
@@ -69,6 +70,28 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
         }
     };
 
+    const handleDownloadPDF = async () => {
+        setIsDownloading(true);
+        try {
+            // Create updated book with all generated images
+            const updatedBook = {
+                ...book,
+                chapters: book.chapters.map((ch, idx) => ({
+                    ...ch,
+                    image: chapterImages[idx]?.image || ch.image || "",
+                    image_prompt: chapterImages[idx]?.image_prompt || ch.image_prompt || ""
+                }))
+            };
+
+            await downloadBookPDF(updatedBook);
+        } catch (error) {
+            console.error("Failed to download PDF:", error);
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     const nextChapter = () => {
         if (currentChapter < totalChapters - 1) {
             setDirection(1);
@@ -111,13 +134,32 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
             {/* Header with Reset Button */}
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-slate-800">{book.title}</h2>
-                <button
-                    onClick={onReset}
-                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-200 transition-colors"
-                >
-                    <RotateCcw className="w-4 h-4" />
-                    New Book
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleDownloadPDF}
+                        disabled={isDownloading}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isDownloading ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Generating PDF...
+                            </>
+                        ) : (
+                            <>
+                                <Download className="w-4 h-4" />
+                                Download PDF
+                            </>
+                        )}
+                    </button>
+                    <button
+                        onClick={onReset}
+                        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-200 transition-colors"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        New Book
+                    </button>
+                </div>
             </div>
 
             {/* Book Layout: Text Left, Image Right */}
