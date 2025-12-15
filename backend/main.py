@@ -84,11 +84,23 @@ def split_into_chapters(text: str) -> List[dict]:
     if matches:
         for i, match in enumerate(matches):
             chapter_num = i + 1
-            chapter_title = match.group(2) if match.group(2) else f"Chapter {chapter_num}"
+            # Get the chapter title from the match, or extract from first line of text
+            chapter_title = match.group(2) if match.group(2) else ""
             
             start_pos = match.end()
             end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(text)
             chapter_text = text[start_pos:end_pos].strip()
+            
+            # If no title in pattern, try to extract from first line
+            if not chapter_title and chapter_text:
+                first_line = chapter_text.split('\n')[0].strip()
+                if len(first_line) < 100:  # Likely a title if short
+                    chapter_title = first_line
+                    # Remove title from text
+                    chapter_text = '\n'.join(chapter_text.split('\n')[1:]).strip()
+            
+            if not chapter_title:
+                chapter_title = f"Chapter {chapter_num}"
             
             if len(chapter_text) > 3000:
                 chapter_text = chapter_text[:3000] + "..."
@@ -114,15 +126,21 @@ def split_into_chapters(text: str) -> List[dict]:
 def simplify_for_kids(text: str) -> str:
     """Simplify text for children aged 6-8"""
     prompt = f"""
-    Rewrite the following story excerpt in simple English for children aged 6-8 years old.
-    Use short sentences, simple words, and make it engaging and fun.
-    Keep the main story elements but make it easy to understand.
-    
-    Original text:
-    {text}
-    
-    Simplified version:
-    """
+You are rewriting a story for children aged 6-8 years old.
+
+Rules:
+1. Use short sentences and simple words
+2. Make it engaging and fun
+3. Keep the main story elements
+4. Return ONLY the simplified story text
+5. Do NOT include any introductory phrases like "Here is the story" or "Simplified version"
+6. Start directly with the story
+
+Original text:
+{text}
+
+Simplified story:
+"""
     
     try:
         def call_api():
@@ -130,7 +148,23 @@ def simplify_for_kids(text: str) -> str:
                 model="gemini-2.5-flash",
                 contents=prompt
             )
-            return response.text.strip()
+            result = response.text.strip()
+            
+            # Remove common unwanted prefixes
+            unwanted_prefixes = [
+                "Here is the story in simple English for children:",
+                "Here is the simplified story:",
+                "Simplified version:",
+                "Here's the story:",
+                "Here is the story:",
+                "Story:"
+            ]
+            
+            for prefix in unwanted_prefixes:
+                if result.startswith(prefix):
+                    result = result[len(prefix):].strip()
+            
+            return result
         
         return retry_with_backoff(call_api)
     except Exception as e:
@@ -140,14 +174,19 @@ def simplify_for_kids(text: str) -> str:
 def generate_image_prompt(simplified_text: str) -> str:
     """Generate a vivid image prompt from the text"""
     prompt = f"""
-    Based on this children's story, create ONE vivid image prompt for a children's book illustration.
-    Make it colorful, engaging, and appropriate for kids.
-    
-    Story:
-    {simplified_text}
-    
-    Return ONLY the image prompt text.
-    """
+Create ONE vivid image prompt for a children's book illustration based on this story.
+
+Requirements:
+- Colorful and engaging
+- Appropriate for kids aged 6-8
+- Describe a specific scene from the story
+- Return ONLY the image prompt, no extra text
+
+Story:
+{simplified_text}
+
+Image prompt:
+"""
     
     try:
         def call_api():

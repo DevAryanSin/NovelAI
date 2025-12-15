@@ -160,18 +160,11 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                                 <p className="text-sm">Generating illustration...</p>
                             </div>
                         ) : getCurrentImage() ? (
-                            <div className="w-full flex flex-col">
-                                <img
-                                    src={getCurrentImage()}
-                                    alt={getCurrentImagePrompt() || `Chapter ${chapter.chapter_number} illustration`}
-                                    className="w-full h-auto max-h-[500px] object-contain rounded-lg shadow-md"
-                                />
-                                {getCurrentImagePrompt() && (
-                                    <p className="mt-4 text-sm text-slate-500 italic text-center">
-                                        "{getCurrentImagePrompt()}"
-                                    </p>
-                                )}
-                            </div>
+                            <img
+                                src={getCurrentImage()}
+                                alt={`Chapter ${chapter.chapter_number} illustration`}
+                                className="w-full h-auto max-h-[500px] object-contain rounded-lg shadow-md"
+                            />
                         ) : (
                             <div className="text-slate-400 text-center">
                                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-200 flex items-center justify-center">
@@ -219,8 +212,8 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                             setCurrentChapter(idx);
                         }}
                         className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${currentChapter === idx
-                                ? "bg-slate-800 text-white"
-                                : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
+                            ? "bg-slate-800 text-white"
+                            : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"
                             }`}
                     >
                         Ch. {ch.chapter_number}
