@@ -4,7 +4,7 @@ import { useState } from "react";
 import InputSection from "@/components/InputSection";
 import StoryDisplay from "@/components/StoryDisplay";
 import { processChapter, ProcessResult } from "@/app/actions";
-import { BookOpen, Sparkles } from "lucide-react";
+import { BookOpen } from "lucide-react";
 
 export default function Home() {
   const [result, setResult] = useState<ProcessResult | null>(null);
@@ -19,7 +19,7 @@ export default function Home() {
       setResult(res);
     } catch (err) {
       console.error(err);
-      setError("Something went wrong while casting the spell! Please try again.");
+      setError("Something went wrong! Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -31,19 +31,19 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 text-slate-800 font-[family-name:var(--font-geist-sans)] p-4 sm:p-8">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-[family-name:var(--font-geist-sans)] p-4 sm:p-8">
       <main className="max-w-6xl mx-auto flex flex-col items-center gap-12 pt-8">
 
         {/* Header */}
         <div className="text-center space-y-4">
-          <div className="inline-block p-3 bg-white rounded-full shadow-md mb-2">
-            <BookOpen className="w-8 h-8 text-purple-600" />
+          <div className="inline-block p-3 bg-white rounded-full shadow-sm mb-2">
+            <BookOpen className="w-8 h-8 text-slate-700" />
           </div>
-          <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 tracking-tight">
-            Magical Story Converter
+          <h1 className="text-4xl font-bold text-slate-800 tracking-tight">
+            Story Illustrator
           </h1>
-          <p className="text-xl text-slate-500 max-w-2xl mx-auto flex items-center justify-center gap-2">
-            Turn boring novels into fun illustrations & videos! <Sparkles className="w-5 h-5 text-yellow-400" />
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+            Transform your stories into illustrated children's books
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-20 text-center text-slate-400 text-sm pb-8">
-        Powered by Google Gemini & Veo
+        Powered by Google Gemini
       </footer>
     </div>
   );

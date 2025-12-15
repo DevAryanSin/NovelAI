@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ProcessResult } from "@/app/actions";
-import { Play, Image as ImageIcon } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
 interface StoryDisplayProps {
     result: ProcessResult;
@@ -14,93 +14,66 @@ export default function StoryDisplay({ result, onReset }: StoryDisplayProps) {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 50 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-4xl mx-auto space-y-8"
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-6xl mx-auto"
         >
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
-                    Your Magic Story
-                </h2>
+            {/* Header with Reset Button */}
+            <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-bold text-slate-800">Your Story</h2>
                 <button
                     onClick={onReset}
-                    className="px-4 py-2 text-purple-600 font-semibold hover:bg-purple-50 rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-200 transition-colors"
                 >
-                    Create New
+                    <RotateCcw className="w-4 h-4" />
+                    New Story
                 </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
-                {/* Left Column: Visuals */}
-                <div className="space-y-6">
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.2 }}
-                        className="bg-white p-2 rounded-3xl shadow-lg border-4 border-yellow-200 rotate-1 transform hover:rotate-0 transition-transform duration-500"
-                    >
-                        <div className="relative aspect-video rounded-2xl overflow-hidden bg-gray-100">
-                            {result.imageUrl ? (
-                                <img
-                                    src={result.imageUrl}
-                                    alt={result.prompts.imagePrompt}
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-gray-300">
-                                    <ImageIcon className="w-12 h-12" />
-                                </div>
-                            )}
-                            <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                                AI Illustration
-                            </div>
-                        </div>
-                    </motion.div>
+            {/* Book Layout: Text Left, Image Right */}
+            <div className="grid md:grid-cols-2 gap-8 bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200">
 
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.4 }}
-                        className="bg-white p-2 rounded-3xl shadow-lg border-4 border-blue-200 -rotate-1 transform hover:rotate-0 transition-transform duration-500"
-                    >
-                        <div className="relative aspect-video rounded-2xl overflow-hidden bg-gray-900">
-                            {result.videoUrl ? (
-                                <video
-                                    src={result.videoUrl}
-                                    controls
-                                    className="w-full h-full object-cover"
-                                    poster={result.imageUrl} // Fallback to image
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-gray-500">
-                                    <Play className="w-12 h-12" />
-                                </div>
-                            )}
-                            <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                                AI Video
-                            </div>
-                        </div>
-                        <p className="mt-2 text-sm text-center text-gray-500 italic">
-                            "{result.prompts.videoPrompt}"
-                        </p>
-                    </motion.div>
-                </div>
-
-                {/* Right Column: Text */}
-                <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white"
-                >
-                    <div className="prose prose-lg prose-purple max-w-none">
+                {/* Left Side: Text Content */}
+                <div className="p-8 md:p-12 overflow-y-auto max-h-[600px]">
+                    <div className="prose prose-slate max-w-none">
                         {paragraphs.map((p, i) => (
-                            <p key={i} className="mb-4 text-slate-700 leading-relaxed font-sans text-lg">
+                            <p key={i} className="mb-4 text-slate-700 leading-relaxed text-base">
                                 {p}
                             </p>
                         ))}
                     </div>
-                </motion.div>
+                </div>
+
+                {/* Right Side: Generated Image */}
+                <div className="relative bg-slate-50 flex items-center justify-center p-8">
+                    {result.image ? (
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="w-full h-full flex flex-col"
+                        >
+                            <img
+                                src={result.image}
+                                alt={result.imagePrompt}
+                                className="w-full h-auto rounded-lg shadow-md object-contain"
+                            />
+                            <p className="mt-4 text-sm text-slate-500 italic text-center">
+                                "{result.imagePrompt}"
+                            </p>
+                        </motion.div>
+                    ) : (
+                        <div className="text-slate-400 text-center">
+                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-200 flex items-center justify-center">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p>No image generated</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </motion.div>
     );
