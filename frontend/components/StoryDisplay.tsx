@@ -10,7 +10,7 @@ interface StoryDisplayProps {
 }
 
 export default function StoryDisplay({ result, onReset }: StoryDisplayProps) {
-    const paragraphs = result.simplifiedText.split("\n").filter(p => p.trim());
+    const paragraphs = (result.simplifiedText || "").split("\n").filter(p => p.trim());
 
     return (
         <motion.div

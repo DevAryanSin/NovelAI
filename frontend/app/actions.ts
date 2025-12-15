@@ -28,6 +28,10 @@ export async function processChapter(text: string): Promise<ProcessResult> {
 
         const data = await response.json();
 
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
         // Map backend snake_case to frontend camelCase if needed
         // Our backend currently returns mixed, let's normalize in backend or here
         return {
