@@ -43,10 +43,10 @@ export default function Home() {
             <BookOpen className="w-8 h-8 text-slate-700" />
           </div>
           <h1 className="text-4xl font-bold text-slate-800 tracking-tight">
-            Story Illustrator
+            NovelAI
           </h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Transform your novels into illustrated children's books
+            Transform novels into illustrated children's books
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-20 text-center text-slate-400 text-sm pb-8">
-        Powered by Google Gemini
+        {/* Powered by Google Gemini */}
       </footer>
     </div>
   );

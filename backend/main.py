@@ -130,6 +130,19 @@ def split_into_chapters(text: str) -> List[dict]:
     
     return chapters[:10]
 
+def shorten_chapter_title(title: str) -> str:
+    """Shorten chapter title to maximum 2 words"""
+    # Remove common prefixes
+    title = title.replace("Chapter", "").replace("CHAPTER", "").strip()
+    
+    # Split into words and take first 2
+    words = title.split()
+    if len(words) <= 2:
+        return title
+    
+    # Take first 2 meaningful words
+    return " ".join(words[:2])
+
 def simplify_for_kids(text: str) -> str:
     """Simplify text for children aged 6-8"""
     prompt = f"""
@@ -264,7 +277,7 @@ async def process_pdf(file: UploadFile = File(...)):
         
         processed_chapters.append(Chapter(
             chapter_number=chapter_data['number'],
-            title=chapter_data['title'],
+            title=shorten_chapter_title(chapter_data['title']),
             simplified_text=simplified,
             image="",  # Empty - will be generated on-demand
             image_prompt=""
