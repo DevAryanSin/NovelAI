@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, RotateCcw, Loader2, Download } from "lucide-react";
-import { ProcessedBook, generateChapterImages } from "@/app/actions";
+import { ProcessedBook, generateChapterImages, simplifyChapter } from "@/app/actions";
 import { downloadBookPDF } from "@/app/client-utils";
 
 interface BookDisplayProps {
@@ -64,13 +64,38 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
         setLoadingImages(prev => ({ ...prev, [chapterIndex]: true }));
 
         try {
-            const images = await generateChapterImages(chapter.chapter_number, chapter.simplified_text);
+            let imagePrompt = chapter.image_prompt;
+            let title = chapter.title;
+            let simplifiedText = chapter.simplified_text;
+
+            // Step 1: Simplify chapter if not already simplified
+            if (!chapter.simplified || !chapter.simplified_text) {
+                const simplifiedData = await simplifyChapter(chapter.chapter_number, chapter.raw_text);
+                imagePrompt = simplifiedData.image_prompt;
+                title = simplifiedData.title;
+                simplifiedText = simplifiedData.simplified_text;
+
+                // Update the chapter in the book
+                book.chapters[chapterIndex] = {
+                    ...chapter,
+                    title: title,
+                    simplified_text: simplifiedText,
+                    image_prompt: imagePrompt,
+                    simplified: true
+                };
+            }
+
+            // Step 2: Generate image using the image prompt
+            const images = await generateChapterImages(chapter.chapter_number, imagePrompt);
             setChapterImages(prev => ({
                 ...prev,
-                [chapterIndex]: images
+                [chapterIndex]: {
+                    image: images.image,
+                    image_prompt: imagePrompt
+                }
             }));
         } catch (error) {
-            console.error(`Failed to load image for chapter ${chapter.chapter_number}:`, error);
+            console.error(`Failed to load chapter ${chapter.chapter_number}:`, error);
         } finally {
             setLoadingImages(prev => ({ ...prev, [chapterIndex]: false }));
         }
@@ -234,11 +259,18 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                             Chapter {chapter.chapter_number}: {chapter.title}
                         </h3>
                         <div className="prose prose-slate max-w-none">
-                            {chapter.simplified_text.split('\n').filter((p: string) => p.trim()).map((paragraph: string, i: number) => (
-                                <p key={i} className="mb-4 text-slate-700 leading-relaxed text-base">
-                                    {paragraph}
-                                </p>
-                            ))}
+                            {!chapter.simplified || !chapter.simplified_text ? (
+                                <div className="text-slate-600 text-center py-12">
+                                    <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin" />
+                                    <p className="text-sm">Simplifying chapter for kids...</p>
+                                </div>
+                            ) : (
+                                chapter.simplified_text.split('\n').filter((p: string) => p.trim()).map((paragraph: string, i: number) => (
+                                    <p key={i} className="mb-4 text-slate-700 leading-relaxed text-base">
+                                        {paragraph}
+                                    </p>
+                                ))
+                            )}
                         </div>
                         <div className="mt-6 pt-4 border-t border-slate-200 text-sm text-slate-400">
                             Chapter {currentChapter + 1} of {totalChapters}

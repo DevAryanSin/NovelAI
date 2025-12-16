@@ -11,9 +11,11 @@ export interface ProcessResult {
 export interface Chapter {
     chapter_number: number;
     title: string;
+    raw_text: string;
     simplified_text: string;
     image: string;
     image_prompt: string;
+    simplified: boolean;
 }
 
 export interface ProcessedBook {
@@ -47,7 +49,33 @@ export async function processPDF(formData: FormData): Promise<ProcessedBook> {
     }
 }
 
-export async function generateChapterImages(chapterNumber: number, simplifiedText: string) {
+export async function simplifyChapter(chapterNumber: number, rawText: string) {
+    try {
+        const response = await fetch(API_ENDPOINTS.SIMPLIFY_CHAPTER, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                chapter_number: chapterNumber,
+                raw_text: rawText,
+            }),
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Simplify Chapter Error:", error);
+        throw error;
+    }
+}
+
+export async function generateChapterImages(chapterNumber: number, imagePrompt: string) {
     try {
         const response = await fetch(API_ENDPOINTS.GENERATE_IMAGES, {
             method: "POST",
@@ -56,7 +84,7 @@ export async function generateChapterImages(chapterNumber: number, simplifiedTex
             },
             body: JSON.stringify({
                 chapter_number: chapterNumber,
-                simplified_text: simplifiedText,
+                image_prompt: imagePrompt,
             }),
             cache: "no-store",
         });
