@@ -15,12 +15,15 @@ from dotenv import load_dotenv
 import PyPDF2
 import io
 import random
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER
-from PIL import Image
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 # -------------------------------------------------------------------
 # INIT
@@ -93,14 +96,17 @@ async def retry_with_backoff(func, *args, max_retries=5, initial_delay=1, **kwar
             return await func(*args, **kwargs)
         except ServerError as e:
             if attempt == max_retries - 1:
+                logger.error(f"Max retries ({max_retries}) reached. Last error: {e}")
                 print(f"Max retries reached. Last error: {e}")
                 raise e
             
             # Check if it's a 503 error (Server Error / Overloaded)
             if hasattr(e, 'code') and e.code != 503:
-                 raise e
+                logger.error(f"Non-503 ServerError encountered: {e}")
+                raise e
 
             delay = initial_delay * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning(f"Gemini 503 Error (Overloaded). Retrying in {delay:.2f}s... (Attempt {attempt + 1}/{max_retries})")
             print(f"Gemini 503 Error (Overloaded). Retrying in {delay:.2f}s... (Attempt {attempt + 1}/{max_retries})")
             await asyncio.sleep(delay)
     return await func(*args, **kwargs) # Should not be reached
@@ -142,6 +148,8 @@ def split_into_chapters(text: str) -> List[dict]:
 # -------------------------------------------------------------------
 
 async def process_chapter_ai(text: str) -> dict:
+    logger.info(f"Starting AI processing for chapter (text length: {len(text)} chars)")
+    
     prompt = f"""
 You are creating a children's storybook for kids aged 6 to 8.
 
@@ -186,6 +194,7 @@ Chapter text:
 
     async def _call_api():
         async with TEXT_SEMAPHORE:
+            logger.debug("Calling Gemini API for chapter processing")
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt,
@@ -197,7 +206,9 @@ Chapter text:
         return response
 
     response = await retry_with_backoff(_call_api)
-    return json.loads(response.text)
+    result = json.loads(response.text)
+    logger.info(f"Chapter AI processing completed. Title: '{result.get('title', 'N/A')}'")
+    return result
 
 
 # -------------------------------------------------------------------
@@ -206,10 +217,14 @@ Chapter text:
 
 async def generate_image_cached(prompt: str) -> str:
     if prompt in IMAGE_CACHE:
+        logger.info(f"Image cache HIT for prompt: '{prompt[:50]}...'")
         return IMAGE_CACHE[prompt]
+    
+    logger.info(f"Image cache MISS. Generating new image for prompt: '{prompt[:50]}...'")
 
     async def _call_api():
         async with IMAGE_SEMAPHORE:
+            logger.debug("Calling Gemini API for image generation")
             response = client.models.generate_content(
                 model="gemini-2.5-flash-image",
                 contents=f"Children's book illustration, colorful: {prompt}",
@@ -225,8 +240,10 @@ async def generate_image_cached(prompt: str) -> str:
                 part.inline_data.data
             ).decode()
             IMAGE_CACHE[prompt] = image
+            logger.info(f"Image generated and cached successfully. Cache size: {len(IMAGE_CACHE)}")
             return image
 
+    logger.warning("No image data found in API response")
     return ""
 
 # -------------------------------------------------------------------
@@ -239,39 +256,52 @@ async def process_pdf(file: UploadFile = File(...)):
     Extract chapters from PDF without AI processing.
     This reduces API load by only extracting text structure.
     """
+    logger.info(f"Received PDF upload request: {file.filename}")
+    
     async def stream():
-        pdf_bytes = await file.read()
-        yield f"data: {json.dumps({'type': 'progress', 'progress': 10})}\n\n"
+        try:
+            pdf_bytes = await file.read()
+            logger.info(f"PDF file read successfully. Size: {len(pdf_bytes)} bytes")
+            yield f"data: {json.dumps({'type': 'progress', 'progress': 10})}\n\n"
 
-        text = extract_text_from_pdf(pdf_bytes)
-        title = text.split("\n")[0][:80] or "Kids Book"
+            text = extract_text_from_pdf(pdf_bytes)
+            logger.info(f"Text extracted from PDF. Total length: {len(text)} characters")
+            title = text.split("\n")[0][:80] or "Kids Book"
+            logger.info(f"Book title: '{title}'")
 
-        yield f"data: {json.dumps({'type': 'progress', 'progress': 30})}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'progress': 30})}\n\n"
 
-        chapters_raw = split_into_chapters(text)
-        chapters: list[Chapter] = []
+            chapters_raw = split_into_chapters(text)
+            logger.info(f"Split into {len(chapters_raw)} chapters")
+            chapters: list[Chapter] = []
 
-        # Only extract chapters, NO AI processing
-        for i, ch in enumerate(chapters_raw):
-            yield f"data: {json.dumps({'type': 'progress', 'message': f'Extracting chapter {i+1}', 'progress': 40 + i * 5})}\n\n"
+            # Only extract chapters, NO AI processing
+            for i, ch in enumerate(chapters_raw):
+                logger.debug(f"Processing chapter {i+1}/{len(chapters_raw)}: Chapter {ch['number']}")
+                yield f"data: {json.dumps({'type': 'progress', 'message': f'Extracting chapter {i+1}', 'progress': 40 + i * 5})}\n\n"
 
-            chapters.append(Chapter(
-                chapter_number=ch["number"],
-                title=f"Chapter {ch['number']}",  # Temporary title
-                raw_text=ch["text"],  # Store raw text
-                simplified_text="",  # Empty until user clicks
-                image_prompt="",
-                image="",
-                simplified=False  # Not yet processed
-            ))
+                chapters.append(Chapter(
+                    chapter_number=ch["number"],
+                    title=f"Chapter {ch['number']}",  # Temporary title
+                    raw_text=ch["text"],  # Store raw text
+                    simplified_text="",  # Empty until user clicks
+                    image_prompt="",
+                    image="",
+                    simplified=False  # Not yet processed
+                ))
 
-        book = ProcessedBook(
-            title=title,
-            total_chapters=len(chapters),
-            chapters=chapters
-        )
+            book = ProcessedBook(
+                title=title,
+                total_chapters=len(chapters),
+                chapters=chapters
+            )
 
-        yield f"data: {json.dumps({'type': 'complete', 'data': book.model_dump(), 'progress': 100})}\n\n"
+            logger.info(f"PDF processing complete. Book: '{title}' with {len(chapters)} chapters")
+            yield f"data: {json.dumps({'type': 'complete', 'data': book.model_dump(), 'progress': 100})}\n\n"
+        
+        except Exception as e:
+            logger.error(f"Error processing PDF: {str(e)}", exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -283,10 +313,12 @@ async def simplify_chapter(req: SimplifyChapterRequest):
     Simplify a single chapter on-demand when user clicks it.
     This is called only when needed, reducing API load.
     """
+    logger.info(f"Received simplify_chapter request for chapter {req.chapter_number}")
     try:
         # Process the chapter with AI
         ai_result = await process_chapter_ai(req.raw_text)
         
+        logger.info(f"Chapter {req.chapter_number} simplified successfully. Title: '{ai_result['title']}'")
         return {
             "success": True,
             "chapter_number": req.chapter_number,
@@ -295,6 +327,7 @@ async def simplify_chapter(req: SimplifyChapterRequest):
             "image_prompt": ai_result["image_prompt"]
         }
     except Exception as e:
+        logger.error(f"Failed to simplify chapter {req.chapter_number}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to simplify chapter: {str(e)}"
@@ -304,72 +337,9 @@ async def simplify_chapter(req: SimplifyChapterRequest):
 
 @app.post("/generate_images")
 async def generate_images(req: ImageRequest):
+    logger.info(f"Received generate_images request for chapter {req.chapter_number}")
     image = await generate_image_cached(req.image_prompt)
+    logger.info(f"Image generation complete for chapter {req.chapter_number}")
     return {"image": image}
 
-# -------------------------------------------------------------------
 
-@app.post("/download_pdf")
-async def download_pdf(book: ProcessedBook):
-    """
-    Generate PDF with all chapters.
-    Simplifies any unsimplified chapters and generates missing images sequentially.
-    """
-    
-    # Step 1: Simplify all unsimplified chapters sequentially
-    for i, chapter in enumerate(book.chapters):
-        if not chapter.simplified or not chapter.simplified_text:
-            print(f"Simplifying chapter {chapter.chapter_number} for PDF...")
-            ai_result = await process_chapter_ai(chapter.raw_text)
-            
-            # Update the chapter with simplified data
-            book.chapters[i].title = ai_result["title"]
-            book.chapters[i].simplified_text = ai_result["simplified_text"]
-            book.chapters[i].image_prompt = ai_result["image_prompt"]
-            book.chapters[i].simplified = True
-    
-    # Step 2: Generate missing images sequentially
-    for i, chapter in enumerate(book.chapters):
-        if not chapter.image and chapter.image_prompt:
-            print(f"Generating image for chapter {chapter.chapter_number}...")
-            book.chapters[i].image = await generate_image_cached(chapter.image_prompt)
-    
-    # Step 3: Build the PDF
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    story = []
-
-    story.append(Paragraph(book.title, styles["Title"]))
-    story.append(Spacer(1, 0.4 * inch))
-
-    for chapter in book.chapters:
-        story.append(Paragraph(
-            f"Chapter {chapter.chapter_number}: {chapter.title}",
-            styles["Heading2"]
-        ))
-        story.append(Spacer(1, 0.2 * inch))
-
-        for para in chapter.simplified_text.split("\n"):
-            if para.strip():
-                story.append(Paragraph(para, styles["BodyText"]))
-                story.append(Spacer(1, 0.1 * inch))
-
-        if chapter.image:
-            img_bytes = base64.b64decode(chapter.image.split(",")[1])
-            img_buf = io.BytesIO(img_bytes)
-            story.append(Spacer(1, 0.2 * inch))
-            story.append(RLImage(img_buf, width=4 * inch, height=4 * inch))
-
-        story.append(PageBreak())
-
-    doc.build(story)
-    buffer.seek(0)
-
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename={book.title}.pdf"
-        }
-    )

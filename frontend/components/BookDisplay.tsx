@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, RotateCcw, Loader2, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, Loader2 } from "lucide-react";
 import { ProcessedBook, generateChapterImages, simplifyChapter } from "@/app/actions";
-import { downloadBookPDF } from "@/app/client-utils";
 
 interface BookDisplayProps {
     book: ProcessedBook;
@@ -16,12 +15,9 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
     const [direction, setDirection] = useState(0);
     const [loadingImages, setLoadingImages] = useState<{ [key: number]: boolean }>({});
     const [chapterImages, setChapterImages] = useState<{ [key: number]: { image: string; image_prompt: string } }>({});
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [downloadProgress, setDownloadProgress] = useState<{
-        current: number;
-        total: number;
-        status: string;
-    } | null>(null);
+
+    // Track which chapters have been initiated to prevent duplicate processing
+    const initiatedChapters = useRef<Set<number>>(new Set());
 
     const totalChapters = book.chapters.length;
 
@@ -50,13 +46,21 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
 
     // Load image for current chapter when chapter changes
     useEffect(() => {
-        const chapter = getCurrentChapter();
+        const chapter = book.chapters[currentChapter];
 
-        // Check if image is already loaded or being loaded
-        if (!chapterImages[currentChapter] && !loadingImages[currentChapter] && !chapter.image) {
+        // Check if:
+        // 1. Chapter hasn't been initiated before (prevents duplicate calls)
+        // 2. Image is not already loaded
+        // 3. Not currently loading
+        // 4. Chapter doesn't have an image yet
+        if (!initiatedChapters.current.has(currentChapter) &&
+            !chapterImages[currentChapter] &&
+            !loadingImages[currentChapter] &&
+            !chapter.image) {
+            initiatedChapters.current.add(currentChapter);
             loadImageForChapter(currentChapter);
         }
-    }, [currentChapter]);
+    }, [currentChapter, book.chapters, chapterImages, loadingImages]);
 
     const loadImageForChapter = async (chapterIndex: number) => {
         const chapter = book.chapters[chapterIndex];
@@ -101,39 +105,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
         }
     };
 
-    const handleDownloadPDF = async () => {
-        setIsDownloading(true);
-        setDownloadProgress({ current: 0, total: 0, status: "Starting..." });
 
-        try {
-            // Create updated book with all generated images
-            const updatedBook = {
-                ...book,
-                chapters: book.chapters.map((ch, idx) => ({
-                    ...ch,
-                    image: chapterImages[idx]?.image || ch.image || "",
-                    image_prompt: chapterImages[idx]?.image_prompt || ch.image_prompt || ""
-                }))
-            };
-
-            await downloadBookPDF(updatedBook, (progress) => {
-                setDownloadProgress({
-                    current: progress.currentChapter,
-                    total: progress.totalChapters,
-                    status: progress.status
-                });
-            });
-
-            // Small delay to show completion
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error) {
-            console.error("Failed to download PDF:", error);
-            alert("Failed to generate PDF. Please try again.");
-        } finally {
-            setIsDownloading(false);
-            setDownloadProgress(null);
-        }
-    };
 
     const nextChapter = () => {
         if (currentChapter < totalChapters - 1) {
@@ -177,66 +149,16 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
             {/* Header with Reset Button */}
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-slate-800">{book.title}</h2>
-                <div className="flex gap-3">
-                    <button
-                        onClick={handleDownloadPDF}
-                        disabled={isDownloading}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isDownloading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Generating PDF...
-                            </>
-                        ) : (
-                            <>
-                                <Download className="w-4 h-4" />
-                                Download PDF
-                            </>
-                        )}
-                    </button>
-                    <button
-                        onClick={onReset}
-                        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-200 transition-colors"
-                    >
-                        <RotateCcw className="w-4 h-4" />
-                        New Book
-                    </button>
-                </div>
+                <button
+                    onClick={onReset}
+                    className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-200 transition-colors"
+                >
+                    <RotateCcw className="w-4 h-4" />
+                    New Book
+                </button>
             </div>
 
-            {/* Progress Bar for PDF Generation */}
-            {downloadProgress && (
-                <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mb-6 bg-white rounded-lg border border-slate-200 p-4 shadow-sm"
-                >
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-slate-700">
-                            {downloadProgress.status}
-                        </span>
-                        {downloadProgress.total > 0 && (
-                            <span className="text-sm text-slate-500">
-                                {downloadProgress.current} / {downloadProgress.total}
-                            </span>
-                        )}
-                    </div>
-                    {downloadProgress.total > 0 && (
-                        <div className="w-full bg-slate-200 rounded-full h-2.5">
-                            <motion.div
-                                className="bg-slate-800 h-2.5 rounded-full"
-                                initial={{ width: 0 }}
-                                animate={{
-                                    width: `${(downloadProgress.current / downloadProgress.total) * 100}%`
-                                }}
-                                transition={{ duration: 0.3 }}
-                            />
-                        </div>
-                    )}
-                </motion.div>
-            )}
+
 
             {/* Book Layout: Text Left, Image Right */}
             <AnimatePresence initial={false} custom={direction} mode="wait">

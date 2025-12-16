@@ -13,8 +13,8 @@ export const API_ENDPOINTS = {
     PROCESS_PDF: `${BACKEND_URL}/process_pdf`,
     SIMPLIFY_CHAPTER: `${BACKEND_URL}/simplify_chapter`,
     GENERATE_IMAGES: `${BACKEND_URL}/generate_images`,
-    DOWNLOAD_PDF: `${BACKEND_URL}/download_pdf`,
 } as const;
+
 
 // Validate required environment variables
 if (!process.env.NEXT_PUBLIC_BACKEND_URL && process.env.NODE_ENV === 'production') {
