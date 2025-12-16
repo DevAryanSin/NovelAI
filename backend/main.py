@@ -9,6 +9,7 @@ import base64
 import re
 import time
 from typing import List, Optional
+import json
 from dotenv import load_dotenv
 import PyPDF2
 import io
@@ -54,20 +55,35 @@ class ImageRequest(BaseModel):
     chapter_number: int
     simplified_text: str
 
-def retry_with_backoff(func, max_retries=3, initial_delay=2):
-    """Retry function with exponential backoff for API overload"""
+def retry_with_backoff(func, max_retries=5, initial_delay=3):
+    """Retry function with exponential backoff for API overload and network errors"""
     for attempt in range(max_retries):
         try:
             return func()
         except Exception as e:
-            error_str = str(e)
-            if "503" in error_str or "UNAVAILABLE" in error_str or "overloaded" in error_str.lower():
-                if attempt < max_retries - 1:
-                    delay = initial_delay * (2 ** attempt)
-                    print(f"API overloaded, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
-                    time.sleep(delay)
-                    continue
+            error_str = str(e).lower()
+            # Check for retryable errors
+            is_retryable = any([
+                "503" in error_str,
+                "unavailable" in error_str,
+                "overloaded" in error_str,
+                "winerror 10053" in error_str,  # Connection aborted
+                "getaddrinfo failed" in error_str,  # DNS/network error
+                "connection" in error_str,
+                "timeout" in error_str,
+                "network" in error_str
+            ])
+            
+            if is_retryable and attempt < max_retries - 1:
+                delay = initial_delay * (2 ** attempt)
+                print(f"Network/API error: {str(e)[:100]}")
+                print(f"Retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(delay)
+                continue
+            
+            # If not retryable or max retries reached, raise the error
             raise e
+    
     raise Exception("Max retries exceeded")
 
 def extract_text_from_pdf(pdf_file: bytes) -> str:
@@ -130,18 +146,45 @@ def split_into_chapters(text: str) -> List[dict]:
     
     return chapters[:10]
 
-def shorten_chapter_title(title: str) -> str:
-    """Shorten chapter title to maximum 2 words"""
-    # Remove common prefixes
-    title = title.replace("Chapter", "").replace("CHAPTER", "").strip()
+def generate_chapter_title(chapter_text: str, chapter_number: int) -> str:
+    """Generate a meaningful, concise chapter title based on content using AI"""
+    prompt = f"""
+Generate a concise, meaningful chapter title for this text.
+
+Requirements:
+- 2-3 words maximum
+- NO verbs (use nouns and adjectives only)
+- Capitalize each word (Title Case)
+- Should capture the essence/theme of the chapter
+- Examples of good titles: "The Time Traveller", "Strange Discovery", "Dark Forest", "Lost Kingdom"
+- Return ONLY the title, no quotes, no extra text
+
+Chapter text:
+{chapter_text[:1000]}
+
+Title:
+"""
     
-    # Split into words and take first 2
-    words = title.split()
-    if len(words) <= 2:
+    try:
+        def call_api():
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            result = response.text.strip()
+            # Remove quotes if present
+            result = result.replace('"', '').replace("'", "")
+            return result
+        
+        title = retry_with_backoff(call_api)
+        # Ensure it's not too long
+        words = title.split()
+        if len(words) > 3:
+            title = " ".join(words[:3])
         return title
-    
-    # Take first 2 meaningful words
-    return " ".join(words[:2])
+    except Exception as e:
+        print(f"Title generation error: {e}")
+        return f"Chapter {chapter_number}"
 
 def simplify_for_kids(text: str) -> str:
     """Simplify text for children aged 6-8"""
@@ -249,45 +292,77 @@ def generate_image(prompt: str) -> str:
         print(f"Image generation error: {e}")
         return ""
 
-@app.post("/process_pdf", response_model=ProcessedBook)
+
+@app.post("/process_pdf")
 async def process_pdf(file: UploadFile = File(...)):
-    """Process uploaded PDF - only simplify text, don't generate images yet"""
+    """Process uploaded PDF with streaming progress updates"""
     
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
     
-    pdf_content = await file.read()
-    full_text = extract_text_from_pdf(pdf_content)
+    async def generate():
+        try:
+            # Read PDF
+            pdf_content = await file.read()
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Extracting text from PDF...', 'progress': 5})}\n\n"
+            
+            full_text = extract_text_from_pdf(pdf_content)
+            
+            lines = full_text.split('\n')
+            book_title = lines[0].strip() if lines else file.filename.replace('.pdf', '')
+            
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Splitting into chapters...', 'progress': 10})}\n\n"
+            
+            raw_chapters = split_into_chapters(full_text)
+            total_chapters = len(raw_chapters)
+            
+            processed_chapters = []
+            
+            for i, chapter_data in enumerate(raw_chapters):
+                chapter_num = chapter_data['number']
+                progress = 10 + int((i / total_chapters) * 80)
+                
+                yield f"data: {json.dumps({'type': 'progress', 'message': f'Processing chapter {i+1} of {total_chapters}...', 'progress': progress})}\n\n"
+                
+                print(f"Processing Chapter {chapter_num}")
+                
+                # Generate meaningful title using AI
+                chapter_title = generate_chapter_title(chapter_data['text'], chapter_num)
+                
+                yield f"data: {json.dumps({'type': 'progress', 'message': f'Simplifying chapter {i+1}: {chapter_title}...', 'progress': progress + 5})}\n\n"
+                
+                # Small delay between API calls
+                time.sleep(1)
+                
+                # Simplify text
+                simplified = simplify_for_kids(chapter_data['text'])
+                
+                # Add delay between chapters to avoid API overload and network issues
+                time.sleep(3)
+                
+                processed_chapters.append(Chapter(
+                    chapter_number=chapter_num,
+                    title=chapter_title,
+                    simplified_text=simplified,
+                    image="",  # Empty - will be generated on-demand
+                    image_prompt=""
+                ))
+            
+            # Send final result
+            result = ProcessedBook(
+                title=book_title,
+                total_chapters=len(processed_chapters),
+                chapters=processed_chapters
+            )
+            
+            yield f"data: {json.dumps({'type': 'complete', 'data': result.model_dump(), 'progress': 100})}\n\n"
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Error processing PDF: {error_msg}")
+            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
     
-    lines = full_text.split('\n')
-    book_title = lines[0].strip() if lines else file.filename.replace('.pdf', '')
-    
-    raw_chapters = split_into_chapters(full_text)
-    
-    processed_chapters = []
-    
-    for chapter_data in raw_chapters:
-        print(f"Processing Chapter {chapter_data['number']}: {chapter_data['title']}")
-        
-        # Only simplify text - don't generate images yet
-        simplified = simplify_for_kids(chapter_data['text'])
-        
-        # Add delay between chapters to avoid API overload
-        time.sleep(1.5)
-        
-        processed_chapters.append(Chapter(
-            chapter_number=chapter_data['number'],
-            title=shorten_chapter_title(chapter_data['title']),
-            simplified_text=simplified,
-            image="",  # Empty - will be generated on-demand
-            image_prompt=""
-        ))
-    
-    return ProcessedBook(
-        title=book_title,
-        total_chapters=len(processed_chapters),
-        chapters=processed_chapters
-    )
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 @app.post("/generate_images")
 async def generate_images(request: ImageRequest):

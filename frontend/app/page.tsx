@@ -3,34 +3,85 @@
 import { useState } from "react";
 import PDFUpload from "@/components/PDFUpload";
 import BookDisplay from "@/components/BookDisplay";
-import { processPDF, ProcessedBook } from "@/app/actions";
+import { ProcessedBook } from "@/app/actions";
 import { BookOpen } from "lucide-react";
 
 export default function Home() {
   const [book, setBook] = useState<ProcessedBook | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState("");
 
   const handleUpload = async (file: File) => {
     setIsProcessing(true);
     setError("");
+    setProgress(0);
+    setProgressMessage("Starting...");
+    
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const result = await processPDF(formData);
-      setBook(result);
+      const response = await fetch("http://localhost:8000/process_pdf", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.type === "progress") {
+              setProgress(data.progress);
+              setProgressMessage(data.message);
+            } else if (data.type === "complete") {
+              setBook(data.data);
+              setProgress(100);
+              setProgressMessage("Complete!");
+            } else if (data.type === "error") {
+              throw new Error(data.message);
+            }
+          }
+        }
+      }
     } catch (err) {
       console.error(err);
       setError("Something went wrong! Please try again.");
     } finally {
       setIsProcessing(false);
+      setProgress(0);
+      setProgressMessage("");
     }
   };
 
   const handleReset = () => {
     setBook(null);
     setError("");
+    setProgress(0);
+    setProgressMessage("");
   };
 
   return (
@@ -57,6 +108,24 @@ export default function Home() {
           </div>
         )}
 
+        {/* Progress Bar */}
+        {isProcessing && (
+          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-700">{progressMessage}</span>
+                <span className="text-sm font-semibold text-slate-800">{progress}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Content Area */}
         <div className="w-full transition-all duration-500">
           {!book ? (
@@ -75,3 +144,4 @@ export default function Home() {
     </div>
   );
 }
+
