@@ -1,5 +1,7 @@
 "use server";
 
+import { API_ENDPOINTS } from "@/lib/config";
+
 export interface ProcessResult {
     simplifiedText: string;
     imagePrompt: string;
@@ -22,7 +24,7 @@ export interface ProcessedBook {
 
 export async function processPDF(formData: FormData): Promise<ProcessedBook> {
     try {
-        const response = await fetch("http://localhost:8000/process_pdf", {
+        const response = await fetch(API_ENDPOINTS.PROCESS_PDF, {
             method: "POST",
             body: formData,
             cache: "no-store",
@@ -47,7 +49,7 @@ export async function processPDF(formData: FormData): Promise<ProcessedBook> {
 
 export async function generateChapterImages(chapterNumber: number, simplifiedText: string) {
     try {
-        const response = await fetch("http://localhost:8000/generate_images", {
+        const response = await fetch(API_ENDPOINTS.GENERATE_IMAGES, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

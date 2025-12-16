@@ -5,6 +5,7 @@ import PDFUpload from "@/components/PDFUpload";
 import BookDisplay from "@/components/BookDisplay";
 import { ProcessedBook } from "@/app/actions";
 import { BookOpen } from "lucide-react";
+import { API_ENDPOINTS } from "@/lib/config";
 
 export default function Home() {
   const [book, setBook] = useState<ProcessedBook | null>(null);
@@ -18,12 +19,12 @@ export default function Home() {
     setError("");
     setProgress(0);
     setProgressMessage("Starting...");
-    
+
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:8000/process_pdf", {
+      const response = await fetch(API_ENDPOINTS.PROCESS_PDF, {
         method: "POST",
         body: formData,
       });
@@ -43,7 +44,7 @@ export default function Home() {
 
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -53,7 +54,7 @@ export default function Home() {
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             const data = JSON.parse(line.slice(6));
-            
+
             if (data.type === "progress") {
               setProgress(data.progress);
               setProgressMessage(data.message);
@@ -117,7 +118,7 @@ export default function Home() {
                 <span className="text-sm font-semibold text-slate-800">{progress}%</span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                <div 
+                <div
                   className="bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${progress}%` }}
                 />

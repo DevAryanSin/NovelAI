@@ -1,5 +1,6 @@
 // Client-side utility functions
 import { ProcessedBook } from "./actions";
+import { API_ENDPOINTS } from "@/lib/config";
 
 export interface PDFProgress {
     currentChapter: number;
@@ -42,7 +43,7 @@ export async function downloadBookPDF(
             }
         }, 5000); // Update every 5 seconds (approximate image generation time)
 
-        const response = await fetch("http://localhost:8000/download_pdf", {
+        const response = await fetch(API_ENDPOINTS.DOWNLOAD_PDF, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
