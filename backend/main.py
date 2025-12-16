@@ -17,7 +17,6 @@ import io
 import random
 import logging
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -25,9 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# -------------------------------------------------------------------
-# INIT
-# -------------------------------------------------------------------
 
 load_dotenv()
 
@@ -47,18 +43,13 @@ if not api_key:
 
 client = genai.Client(api_key=api_key)
 
-# -------------------------------------------------------------------
-# GLOBAL LIMITS & CACHES (CRITICAL)
-# -------------------------------------------------------------------
 
-TEXT_SEMAPHORE = asyncio.Semaphore(2)      # Gemini Flash
-IMAGE_SEMAPHORE = asyncio.Semaphore(1)     # Gemini Image
 
-IMAGE_CACHE: dict[str, str] = {}           # prompt -> base64 image
+TEXT_SEMAPHORE = asyncio.Semaphore(2)      
+IMAGE_SEMAPHORE = asyncio.Semaphore(1)     
 
-# -------------------------------------------------------------------
-# MODELS
-# -------------------------------------------------------------------
+IMAGE_CACHE: dict[str, str] = {}           
+
 
 class Chapter(BaseModel):
     chapter_number: int
@@ -82,15 +73,10 @@ class SimplifyChapterRequest(BaseModel):
     chapter_number: int
     raw_text: str
 
-# -------------------------------------------------------------------
-# RETRY LOGIC (NEW)
-# -------------------------------------------------------------------
+# Retry Logic
 
 async def retry_with_backoff(func, *args, max_retries=5, initial_delay=1, **kwargs):
-    """
-    Retries an async function if it raises a ServerError (503).
-    Uses exponential backoff with jitter.
-    """
+    
     for attempt in range(max_retries):
         try:
             return await func(*args, **kwargs)
@@ -100,7 +86,6 @@ async def retry_with_backoff(func, *args, max_retries=5, initial_delay=1, **kwar
                 print(f"Max retries reached. Last error: {e}")
                 raise e
             
-            # Check if it's a 503 error (Server Error / Overloaded)
             if hasattr(e, 'code') and e.code != 503:
                 logger.error(f"Non-503 ServerError encountered: {e}")
                 raise e
@@ -109,11 +94,9 @@ async def retry_with_backoff(func, *args, max_retries=5, initial_delay=1, **kwar
             logger.warning(f"Gemini 503 Error (Overloaded). Retrying in {delay:.2f}s... (Attempt {attempt + 1}/{max_retries})")
             print(f"Gemini 503 Error (Overloaded). Retrying in {delay:.2f}s... (Attempt {attempt + 1}/{max_retries})")
             await asyncio.sleep(delay)
-    return await func(*args, **kwargs) # Should not be reached
+    return await func(*args, **kwargs) 
 
-# -------------------------------------------------------------------
-# HELPERS
-# -------------------------------------------------------------------
+
 
 def extract_text_from_pdf(pdf_file: bytes) -> str:
     try:
@@ -143,9 +126,7 @@ def split_into_chapters(text: str) -> List[dict]:
 
     return chapters[:10]
 
-# -------------------------------------------------------------------
-# SINGLE AI CALL PER CHAPTER (🔥 BIG FIX)
-# -------------------------------------------------------------------
+# Chapter Processing using API
 
 async def process_chapter_ai(text: str) -> dict:
     logger.info(f"Starting AI processing for chapter (text length: {len(text)} chars)")
@@ -211,9 +192,7 @@ Chapter text:
     return result
 
 
-# -------------------------------------------------------------------
-# IMAGE GENERATION (CACHED)
-# -------------------------------------------------------------------
+#  Image Generation 
 
 async def generate_image_cached(prompt: str) -> str:
     if prompt in IMAGE_CACHE:
@@ -246,16 +225,11 @@ async def generate_image_cached(prompt: str) -> str:
     logger.warning("No image data found in API response")
     return ""
 
-# -------------------------------------------------------------------
-# API ENDPOINTS
-# -------------------------------------------------------------------
+
 
 @app.post("/process_pdf")
 async def process_pdf(file: UploadFile = File(...)):
-    """
-    Extract chapters from PDF without AI processing.
-    This reduces API load by only extracting text structure.
-    """
+    
     logger.info(f"Received PDF upload request: {file.filename}")
     
     async def stream():
@@ -275,19 +249,19 @@ async def process_pdf(file: UploadFile = File(...)):
             logger.info(f"Split into {len(chapters_raw)} chapters")
             chapters: list[Chapter] = []
 
-            # Only extract chapters, NO AI processing
+            # Extract chapters without AI processing
             for i, ch in enumerate(chapters_raw):
                 logger.debug(f"Processing chapter {i+1}/{len(chapters_raw)}: Chapter {ch['number']}")
                 yield f"data: {json.dumps({'type': 'progress', 'message': f'Extracting chapter {i+1}', 'progress': 40 + i * 5})}\n\n"
 
                 chapters.append(Chapter(
                     chapter_number=ch["number"],
-                    title=f"Chapter {ch['number']}",  # Temporary title
-                    raw_text=ch["text"],  # Store raw text
-                    simplified_text="",  # Empty until user clicks
+                    title=f"Chapter {ch['number']}",  
+                    raw_text=ch["text"],  
+                    simplified_text="",  
                     image_prompt="",
                     image="",
-                    simplified=False  # Not yet processed
+                    simplified=False  
                 ))
 
             book = ProcessedBook(
@@ -305,14 +279,13 @@ async def process_pdf(file: UploadFile = File(...)):
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
-# -------------------------------------------------------------------
+
 
 @app.post("/simplify_chapter")
 async def simplify_chapter(req: SimplifyChapterRequest):
-    """
-    Simplify a single chapter on-demand when user clicks it.
-    This is called only when needed, reducing API load.
-    """
+    
+    # Simplify singular chapter per demand
+
     logger.info(f"Received simplify_chapter request for chapter {req.chapter_number}")
     try:
         # Process the chapter with AI
@@ -333,7 +306,6 @@ async def simplify_chapter(req: SimplifyChapterRequest):
             detail=f"Failed to simplify chapter: {str(e)}"
         )
 
-# -------------------------------------------------------------------
 
 @app.post("/generate_images")
 async def generate_images(req: ImageRequest):

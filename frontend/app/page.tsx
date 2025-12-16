@@ -102,14 +102,12 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="w-full max-w-lg bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-center">
             {error}
           </div>
         )}
 
-        {/* Progress Bar */}
         {isProcessing && (
           <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
             <div className="space-y-3">
@@ -127,7 +125,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Content Area */}
         <div className="w-full transition-all duration-500">
           {!book ? (
             <PDFUpload onUpload={handleUpload} isProcessing={isProcessing} />
@@ -138,9 +135,8 @@ export default function Home() {
 
       </main>
 
-      {/* Footer */}
       <footer className="mt-20 text-center text-slate-400 text-sm pb-8">
-        {/* Powered by Google Gemini */}
+        Powered by NovelAI
       </footer>
     </div>
   );
