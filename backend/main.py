@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import json
 import time
+import tempfile
+import os
 
 # Import from our modular files
 from pdf_processor import extract_text_from_pdf, split_into_chapters, generate_pdf_content
@@ -53,12 +55,19 @@ async def process_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
     
     async def generate():
+        # Use temporary file to handle large PDFs
+        tmp_path = None
         try:
-            # Read PDF
-            pdf_content = await file.read()
+            # Save uploaded file to /tmp directory
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                content = await file.read()
+                tmp.write(content)
+                tmp_path = tmp.name
+            
             yield f"data: {json.dumps({'type': 'progress', 'message': 'Extracting text from PDF...', 'progress': 5})}\n\n"
             
-            full_text = extract_text_from_pdf(pdf_content)
+            # Extract text from temporary file (reduces memory pressure)
+            full_text = extract_text_from_pdf(tmp_path)
             
             lines = full_text.split('\n')
             book_title = lines[0].strip() if lines else file.filename.replace('.pdf', '')
@@ -113,6 +122,14 @@ async def process_pdf(file: UploadFile = File(...)):
             error_msg = str(e)
             print(f"Error processing PDF: {error_msg}")
             yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+        finally:
+            # Clean up temporary file
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                    print(f"Cleaned up temporary file: {tmp_path}")
+                except Exception as e:
+                    print(f"Error cleaning up temporary file: {e}")
     
     return StreamingResponse(generate(), media_type="text/event-stream")
 

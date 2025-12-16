@@ -3,18 +3,38 @@
 import PyPDF2
 import io
 import re
-from typing import List
+import tempfile
+import os
+from typing import List, Union
 from fastapi import HTTPException
 
 
-def extract_text_from_pdf(pdf_file: bytes) -> str:
-    """Extract text from PDF file"""
+def extract_text_from_pdf(pdf_file: Union[bytes, str]) -> str:
+    """
+    Extract text from PDF file
+    
+    Args:
+        pdf_file: Either bytes content or path to PDF file
+    
+    Returns:
+        Extracted text from PDF
+    """
     try:
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file))
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        return text
+        # If it's a file path (string), read from disk
+        if isinstance(pdf_file, str):
+            with open(pdf_file, 'rb') as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + "\n"
+                return text
+        # Otherwise, treat as bytes and read from memory
+        else:
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file))
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            return text
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading PDF: {str(e)}")
 
