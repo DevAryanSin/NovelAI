@@ -1,6 +1,8 @@
-# NovelAI - AI-Powered Children's Storybook Generator
+# NovelAI - AI Powered Children's Storybook Generator
 
 Transform any PDF into an engaging, illustrated children's storybook using Google's Gemini API.
+
+## Link - https://novel-ai-one.vercel.app/
 
 
 ## Overview
@@ -14,7 +16,7 @@ This project fundamentally relies on **two distinct Gemini models** to achieve i
 ### 1. **Gemini 2.5 Flash (Text Generation)**
 - **Purpose**: Simplifies complex text into child-friendly language
 - **Why it's necessary**: 
-  - Transforms adult-level content into age-appropriate narratives
+  - Transforms hard english language content into simple english content for kids
   - Generates concise, meaningful chapter titles (2-3 words)
   - Gemini chatbot answers from uploaded novel pdf as core memory
   - Creates detailed image prompts for illustration generation
@@ -36,8 +38,8 @@ response = client.models.generate_content(
 ### 2. **Gemini 2.5 Flash Image (Image Generation)**
 - **Purpose**: Creates colorful children's book illustrations
 - **Why it's necessary**:
-  - Generates unique, context-aware images for each chapter
-  - Produces child-friendly, vibrant illustrations
+  - Generates unique, context aware images for each chapter
+  - Produces child friendly, vibrant illustrations
   - Maintains consistent artistic style throughout the book
   - No external image APIs or databases required
 
@@ -54,15 +56,16 @@ response = client.models.generate_content(
 ## Features
 
 -  **PDF Text Extraction**: Automatically extracts and chunks content into chapters
+-  **ChatBot**: Answers kids questions in simple language based on the novel
 -  **Text Simplification**: Converts complex text into simple, engaging stories
 -  **AI Generated Illustrations**: Creates unique images for each chapter
--  **Lazy Loading**: On-demand chapter processing for optimised performance
+-  **Lazy Loading**: On demand chapter processing for optimised performance
 -  **Image Caching**: Reduces redundant API calls and improves speed
 -  **Retry Mechanism**: Robust error handling with exponential backoff
--  **Rate Limiting**: Semaphore-based concurrency control
+-  **Rate Limiting**: Semaphore based concurrency control
 
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -120,7 +123,7 @@ response = client.models.generate_content(
 5. **Enjoy**: Read the simplified story with beautiful AI-generated illustrations!
 
 
-## ⚡ Gemini API Optimization Techniques
+##  Gemini API Optimization Techniques
 
 ### 1. **Concurrency Control**
 ```python
@@ -177,4 +180,3 @@ config=types.GenerateContentConfig(
 
 ---
 
-**Built with ❤️ using Google Gemini API**
