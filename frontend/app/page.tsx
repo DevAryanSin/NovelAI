@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import PDFUpload from "@/components/PDFUpload";
 import BookDisplay from "@/components/BookDisplay";
 import { ProcessedBook } from "@/app/actions";
@@ -13,6 +13,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
+  const bookDisplayRef = useRef<HTMLDivElement>(null);
 
   const handleUpload = async (file: File) => {
     setIsProcessing(true);
@@ -62,6 +63,10 @@ export default function Home() {
               setBook(data.data);
               setProgress(100);
               setProgressMessage("Complete!");
+              // Scroll to book display when generated
+              setTimeout(() => {
+                bookDisplayRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
             } else if (data.type === "error") {
               throw new Error(data.message);
             }
@@ -115,9 +120,9 @@ export default function Home() {
                 <span className="text-sm font-medium text-slate-700">{progressMessage}</span>
                 <span className="text-sm font-semibold text-slate-800">{progress}%</span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full transition-all duration-300 ease-out"
+                  className="bg-slate-800 h-full rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -125,7 +130,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="w-full transition-all duration-500">
+        <div ref={bookDisplayRef} className="w-full transition-all duration-500">
           {!book ? (
             <PDFUpload onUpload={handleUpload} isProcessing={isProcessing} />
           ) : (
