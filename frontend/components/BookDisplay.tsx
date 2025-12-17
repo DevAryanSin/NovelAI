@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, RotateCcw, Loader2 } from "lucide-react";
 import { ProcessedBook, generateChapterImages, simplifyChapter } from "@/app/actions";
+import Chatbot from "./Chatbot";
 
 interface BookDisplayProps {
     book: ProcessedBook;
@@ -267,6 +268,9 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                     </button>
                 ))}
             </div>
+
+            {/* Chatbot Section */}
+            <Chatbot book={book} />
         </motion.div>
     );
 }

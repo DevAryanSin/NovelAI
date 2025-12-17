@@ -17,6 +17,9 @@ import io
 import random
 import logging
 
+# Import chat module
+from chat import ChatRequest, ChatResponse, generate_chat_response
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -54,11 +57,11 @@ IMAGE_CACHE: dict[str, str] = {}
 class Chapter(BaseModel):
     chapter_number: int
     title: Optional[str] = ""
-    raw_text: str  # Original extracted text
+    raw_text: str  
     simplified_text: Optional[str] = ""
     image: Optional[str] = ""
     image_prompt: Optional[str] = ""
-    simplified: bool = False  # Track if chapter has been processed
+    simplified: bool = False  
 
 class ProcessedBook(BaseModel):
     title: str
@@ -313,5 +316,33 @@ async def generate_images(req: ImageRequest):
     image = await generate_image_cached(req.image_prompt)
     logger.info(f"Image generation complete for chapter {req.chapter_number}")
     return {"image": image}
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    """
+    Chat endpoint that answers questions about the book using Gemini API.
+    """
+    logger.info(f"Received chat request: '{req.message[:50]}...'")
+    
+    response = await generate_chat_response(
+        client=client,
+        message=req.message,
+        book_context=req.book_context,
+        book_title=req.book_title,
+        text_semaphore=TEXT_SEMAPHORE,
+        retry_func=retry_with_backoff
+    )
+    
+    if response.success:
+        logger.info("Chat response generated successfully")
+        return {"success": True, "response": response.response}
+    else:
+        logger.error(f"Chat response failed: {response.error}")
+        raise HTTPException(
+            status_code=500,
+            detail=response.error or "Failed to generate chat response"
+        )
+
 
 

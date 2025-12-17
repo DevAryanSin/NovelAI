@@ -100,3 +100,31 @@ export async function generateChapterImages(chapterNumber: number, imagePrompt: 
         throw error;
     }
 }
+
+export async function sendChatMessage(message: string, bookContext: string, bookTitle: string) {
+    try {
+        const response = await fetch(API_ENDPOINTS.CHAT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                message: message,
+                book_context: bookContext,
+                book_title: bookTitle,
+            }),
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            throw new Error(`Backend error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Chat Error:", error);
+        throw error;
+    }
+}
+

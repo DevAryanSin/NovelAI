@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
     PROCESS_PDF: `${BACKEND_URL}/process_pdf`,
     SIMPLIFY_CHAPTER: `${BACKEND_URL}/simplify_chapter`,
     GENERATE_IMAGES: `${BACKEND_URL}/generate_images`,
+    CHAT: `${BACKEND_URL}/chat`,
 } as const;
 
 
