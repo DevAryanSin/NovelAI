@@ -4,6 +4,9 @@ Transform any PDF into an engaging, illustrated children's storybook using Googl
 
 ## Link - https://novel-ai-one.vercel.app/
 
+## Backend -
+- **main.py**: Contains the core logic of PDF processing, gemini initialisation text and image API calls
+- **chat.py**: Contains the logic of chatbot query and answering
 
 ## Overview
 
