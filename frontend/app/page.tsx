@@ -63,7 +63,6 @@ export default function Home() {
               setBook(data.data);
               setProgress(100);
               setProgressMessage("Complete!");
-              // Scroll to book display when generated
               setTimeout(() => {
                 bookDisplayRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
               }, 100);

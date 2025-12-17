@@ -1,7 +1,7 @@
 
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
-// API Endpoints
+// API 
 export const API_ENDPOINTS = {
     PROCESS_PDF: `${BACKEND_URL}/process_pdf`,
     SIMPLIFY_CHAPTER: `${BACKEND_URL}/simplify_chapter`,

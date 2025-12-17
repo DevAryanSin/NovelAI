@@ -1,7 +1,3 @@
-"""
-Chat module for NovelAI - Handles chatbot functionality using Gemini API
-"""
-
 from google import genai
 from google.genai import types
 from pydantic import BaseModel

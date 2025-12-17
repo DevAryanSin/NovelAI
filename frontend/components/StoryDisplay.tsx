@@ -19,7 +19,7 @@ export default function StoryDisplay({ result, onReset }: StoryDisplayProps) {
             transition={{ duration: 0.5 }}
             className="w-full max-w-6xl mx-auto"
         >
-            {/* Header with Reset Button */}
+            {/* Reset Button */}
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-slate-800">Your Story</h2>
                 <button
@@ -31,10 +31,10 @@ export default function StoryDisplay({ result, onReset }: StoryDisplayProps) {
                 </button>
             </div>
 
-            {/* Book Layout: Text Left, Image Right */}
+            {/* Text Left, Image Right */}
             <div className="grid md:grid-cols-2 gap-8 bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200">
 
-                {/* Left Side: Text Content */}
+                {/*  Text Content */}
                 <div className="p-8 md:p-12 overflow-y-auto max-h-[600px]">
                     <div className="prose prose-slate max-w-none">
                         {paragraphs.map((p, i) => (
@@ -45,7 +45,7 @@ export default function StoryDisplay({ result, onReset }: StoryDisplayProps) {
                     </div>
                 </div>
 
-                {/* Right Side: Generated Image */}
+                {/*  Generated Image */}
                 <div className="relative bg-slate-50 flex items-center justify-center p-8">
                     {result.image ? (
                         <motion.div

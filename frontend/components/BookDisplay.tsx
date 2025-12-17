@@ -49,11 +49,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
     useEffect(() => {
         const chapter = book.chapters[currentChapter];
 
-        // Check if:
-        // 1. Chapter hasn't been initiated before (prevents duplicate calls)
-        // 2. Image is not already loaded
-        // 3. Not currently loading
-        // 4. Chapter doesn't have an image yet
+        //Check chapter image if already generated
         if (!initiatedChapters.current.has(currentChapter) &&
             !chapterImages[currentChapter] &&
             !loadingImages[currentChapter] &&
@@ -73,7 +69,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
             let title = chapter.title;
             let simplifiedText = chapter.simplified_text;
 
-            // Step 1: Simplify chapter if not already simplified
+            // Simplify chapter if not already simplified
             if (!chapter.simplified || !chapter.simplified_text) {
                 const simplifiedData = await simplifyChapter(chapter.chapter_number, chapter.raw_text);
                 imagePrompt = simplifiedData.image_prompt;
@@ -90,7 +86,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                 };
             }
 
-            // Step 2: Generate image using the image prompt
+            // Generate image using the image prompt
             const images = await generateChapterImages(chapter.chapter_number, imagePrompt);
             setChapterImages(prev => ({
                 ...prev,
@@ -147,7 +143,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
             transition={{ duration: 0.5 }}
             className="w-full max-w-6xl mx-auto"
         >
-            {/* Header with Reset Button */}
+            {/* New Book Reset button */}
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-slate-800">{book.title}</h2>
                 <button
@@ -161,7 +157,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
 
 
 
-            {/* Book Layout: Text Left, Image Right */}
+            {/*  Text Left, Image Right */}
             <AnimatePresence initial={false} custom={direction} mode="wait">
                 <motion.div
                     key={currentChapter}
@@ -176,7 +172,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                     }}
                     className="grid md:grid-cols-2 gap-8 bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-200"
                 >
-                    {/* Left Side: Text Content */}
+                    {/* Text Content */}
                     <div className="p-8 md:p-12 overflow-y-auto max-h-[600px]">
                         <h3 className="text-xl font-semibold text-slate-800 mb-4">
                             Chapter {chapter.chapter_number}: {chapter.title}
@@ -200,7 +196,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                         </div>
                     </div>
 
-                    {/* Right Side: Generated Image */}
+                    {/* Generated Image */}
                     <div className="relative bg-slate-50 flex items-center justify-center p-8">
                         {isLoadingCurrentChapter ? (
                             <div className="text-slate-600 text-center">
@@ -250,7 +246,7 @@ export default function BookDisplay({ book, onReset }: BookDisplayProps) {
                 </button>
             </div>
 
-            {/* Chapter Quick Navigation */}
+            {/* Chapter wise Navigation */}
             <div className="mt-6 flex gap-2 justify-center flex-wrap">
                 {book.chapters.map((ch, idx) => (
                     <button

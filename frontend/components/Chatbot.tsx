@@ -39,7 +39,7 @@ export default function Chatbot({ book }: ChatbotProps) {
         const userMessage = input.trim();
         setInput("");
 
-        // Add user message
+        // user message
         setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
         setIsLoading(true);
 
@@ -99,7 +99,7 @@ export default function Chatbot({ book }: ChatbotProps) {
                 <h3 className="text-lg font-semibold text-slate-800">Ask About the Story</h3>
             </div>
 
-            {/* Chat Container */}
+            {/* Chat  */}
             <div className="bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden">
                 {/* Messages Area */}
                 <div className="h-[400px] overflow-y-auto p-6 space-y-4 bg-slate-50">
@@ -126,7 +126,7 @@ export default function Chatbot({ book }: ChatbotProps) {
                         ))}
                     </AnimatePresence>
 
-                    {/* Loading Indicator */}
+                    {/* Loading  */}
                     {isLoading && (
                         <motion.div
                             initial={{ opacity: 0 }}

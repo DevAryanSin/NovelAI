@@ -17,7 +17,6 @@ import io
 import random
 import logging
 
-# Import chat module
 from chat import ChatRequest, ChatResponse, generate_chat_response
 
 logging.basicConfig(
@@ -320,9 +319,7 @@ async def generate_images(req: ImageRequest):
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    """
-    Chat endpoint that answers questions about the book using Gemini API.
-    """
+    
     logger.info(f"Received chat request: '{req.message[:50]}...'")
     
     response = await generate_chat_response(
